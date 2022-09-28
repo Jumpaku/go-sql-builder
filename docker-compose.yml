@@ -1,0 +1,37 @@
+version: "3"
+
+services:
+  dev:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    tty: true
+    volumes:
+      - ./:/workspace
+    environment:
+      - APP_PORT=80
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=
+      - MYSQL_USER=app
+      - MYSQL_PASSWORD=${MYSQL_APP_PASSWORD}
+      - MYSQL_DATABASE=main
+
+  # docker compose exec mysql bash -c 'mysql -u app -p main < /workspace/init_mysql.sql'
+  mysql:
+    image: mysql
+    # environments are read from .env
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_USER=app
+      - MYSQL_PASSWORD=${MYSQL_APP_PASSWORD}
+      - MYSQL_DATABASE=main
+    volumes:
+      - unity1week-2209-mysql-data:/var/lib/mysql
+      - ./:/workspace
+
+  adminer:
+    image: adminer
+    ports: ["${ADMINER_PORTS}"]
+
+volumes:
+  unity1week-2209-mysql-data:
