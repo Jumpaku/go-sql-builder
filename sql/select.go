@@ -20,15 +20,15 @@ type Params struct {
 	params []Param
 }
 
-func (p Params) Append(values ...any) {
+func (p *Params) Append(values ...any) {
 	for _, value := range values {
 		p.params = append(p.params, Param{value: value})
 	}
 }
-func (p Params) AppendWithName(name string, value any) {
+func (p *Params) AppendWithName(name string, value any) {
 	p.params = append(p.params, Param{name: &name, value: value})
 }
-func (p Params) Merge(params Params) {
+func (p *Params) Merge(params Params) {
 	p.params = append(p.params, params.params...)
 }
 
@@ -37,7 +37,7 @@ type SelectStmt struct {
 	Params   Params
 }
 type FromBuilder interface {
-	From(items ...fromItem) WhereBuilder
+	From(items ...FromItem) WhereBuilder
 }
 type WhereBuilder interface {
 	GroupByBuilder
@@ -84,7 +84,7 @@ type LimitOffset struct {
 }
 type selectBuilder struct {
 	columns     []string
-	from        []fromItem
+	from        []FromItem
 	where       boolExpr
 	groupBy     *GroupBy
 	orderBy     *OrderBy
@@ -101,7 +101,7 @@ func SelectAll() FromBuilder {
 		columns: ([]string{"*"}),
 	}
 }
-func (stmt *selectBuilder) From(items ...fromItem) WhereBuilder {
+func (stmt *selectBuilder) From(items ...FromItem) WhereBuilder {
 	stmt.from = items
 	return stmt
 }

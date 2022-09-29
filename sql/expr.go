@@ -1,38 +1,123 @@
 package sql
 
-func Not(expr boolExpr) boolExpr { return &boolExprImpl{negate: true, terms: []boolExpr{expr}} }
-func And(expr ...boolExpr) boolExpr {
-	return &boolExprImpl{negate: false, boolOp: boolOp_AND, terms: expr}
-}
-func Or(expr ...boolExpr) boolExpr {
-	return &boolExprImpl{negate: false, boolOp: boolOp_OR, terms: expr}
-}
-func Eq(target string, param any) boolExpr {
-	return newBoolCompareTerm(compareOp_EQ, target, param)
-}
-func Neq(target string, param any) boolExpr {
-	return newBoolCompareTerm(compareOp_NEQ, target, param)
-}
-func Lt(target string, param any) boolExpr {
-	return newBoolCompareTerm(compareOp_LT, target, param)
-}
-func Leq(target string, param any) boolExpr {
-	return newBoolCompareTerm(compareOp_LEQ, target, param)
-}
-func Gt(target string, param any) boolExpr {
-	return newBoolCompareTerm(compareOp_GT, target, param)
-}
-func Geq(target string, param any) boolExpr {
-	return newBoolCompareTerm(compareOp_GEQ, target, param)
-}
-func Like(text string, pattern string) boolExpr {
-	return &likeTerm{text: text, pattern: pattern}
-}
-
-type Expr interface {
+type expr interface {
 	BuildParams() Params
 	BuildTemplate() string
 }
+type simpleTerm struct {
+	template string
+	params   Params
+}
+
+func (e *simpleTerm) BuildParams() Params   { return e.params }
+func (e *simpleTerm) BuildTemplate() string { return e.template }
+
+type predOp string
+
+const (
+	predOp_AND predOp = "AND"
+	predOp_OR  predOp = "OR"
+)
+
+type pred interface {
+	BuildParams() Params
+	BuildTemplate() string
+}
+type predImpl struct {
+	negated bool
+	pred    pred
+}
+
+func (e *predImpl) BuildParams() Params   { return e.pred.BuildParams() }
+func (e *predImpl) BuildTemplate() string { return "NOT ( " + e.pred.BuildTemplate() + ")" }
+
+type predTerms struct {
+	predOp predOp
+	terms  []pred
+}
+
+func (e *predTerms) BuildParams() Params {
+	var params Params
+	for _, term := range e.terms {
+		params.Merge(term.BuildParams())
+	}
+	return params
+}
+func (e *predTerms) BuildTemplate() string {
+	template := ""
+	for i, term := range e.terms {
+		if i > 0 {
+			template += " " + string(e.predOp) + " "
+		}
+		template += term.BuildTemplate()
+	}
+	return template
+}
+
+type simplePred struct {
+	template string
+	params   Params
+}
+
+func (e *simplePred) BuildParams() Params   { return e.params }
+func (e *simplePred) BuildTemplate() string { return e.template }
+
+func Pred(template string, params ...Param) pred {
+	return &simplePred{template: template, params: Params{params: params}}
+}
+func True() pred         { return Pred("TRUE") }
+func False() pred        { return Pred("FALSE") }
+func Not(pred pred) pred { return &predImpl{negated: true, pred: pred} }
+func And(left pred, right pred, rest ...pred) pred {
+	return &predTerms{predOp: predOp_AND, terms: append([]pred{left, right}, rest...)}
+}
+func Or(left pred, right pred, rest ...pred) pred {
+	return &predTerms{predOp: predOp_OR, terms: append([]pred{left, right}, rest...)}
+}
+func Eq(target string, param any) pred {
+	return compareTerm(compareOp_EQ, target, param)
+}
+func Neq(target string, param any) pred {
+	return compareTerm(compareOp_NEQ, target, param)
+}
+func Lt(target string, param any) pred {
+	return compareTerm(compareOp_LT, target, param)
+}
+func Leq(target string, param any) pred {
+	return compareTerm(compareOp_LEQ, target, param)
+}
+func Gt(target string, param any) pred {
+	return compareTerm(compareOp_GT, target, param)
+}
+func Geq(target string, param any) pred {
+	return compareTerm(compareOp_GEQ, target, param)
+}
+func Like(text string, pattern string) pred {
+	return Pred(text + " LIKE " + pattern)
+}
+func IsNull(target string) pred {
+	return Pred(target + " IS NULL")
+}
+func IsNotNull(target string) pred {
+	return Pred(target + " IS NOT NULL")
+}
+func In(target string, values ...any) pred {
+	template := target + " IN ("
+	params := []Param{}
+	for i, v := range values {
+		if i > 0 {
+			template += ","
+		}
+		template += "?"
+		params = append(params, Param{value: v})
+
+	}
+	return Pred(template, params...)
+}
+func Between(target string, fromValue any, toValue any) pred {
+	return Pred(target + " IS NOT NULL")
+}
+
 type simpleExpr struct {
 	template string
 	params   Params
@@ -40,44 +125,6 @@ type simpleExpr struct {
 
 func (e *simpleExpr) BuildParams() Params   { return e.params }
 func (e *simpleExpr) BuildTemplate() string { return e.template }
-
-type boolExpr interface {
-	BuildParams() Params
-	BuildTemplate() string
-}
-type boolOp string
-
-const (
-	boolOp_AND boolOp = "AND"
-	boolOp_OR  boolOp = "OR"
-)
-
-type boolExprImpl struct {
-	negate bool
-	boolOp boolOp
-	terms  []boolExpr
-}
-
-func (e *boolExprImpl) BuildParams() Params {
-	var params Params
-	for _, term := range e.terms {
-		params.Merge(term.BuildParams())
-	}
-	return params
-}
-func (e *boolExprImpl) BuildTemplate() string {
-	template := ""
-	for i, term := range e.terms {
-		if i > 0 {
-			template += " " + string(e.boolOp) + " "
-		}
-		template += term.BuildTemplate()
-	}
-	if e.negate {
-		template = "NOT (" + template + ")"
-	}
-	return template
-}
 
 type compareOp int
 
@@ -90,22 +137,9 @@ const (
 	compareOp_GEQ
 )
 
-type boolCompareTerm struct {
-	operator compareOp
-	left     Expr
-	right    Expr
-}
-
-func (e *boolCompareTerm) BuildParams() Params {
-	var params Params
-	params.Append(e.left.BuildParams())
-	params.Append(e.right.BuildParams())
-	return params
-}
-func (e *boolCompareTerm) BuildTemplate() string {
-	var template string
-	template += e.left.BuildTemplate()
-	switch e.operator {
+func compareTerm(op compareOp, target string, param any) pred {
+	template := target
+	switch op {
 	case compareOp_EQ:
 		template += " = "
 	case compareOp_NEQ:
@@ -119,24 +153,6 @@ func (e *boolCompareTerm) BuildTemplate() string {
 	case compareOp_GEQ:
 		template += " >= "
 	}
-	template += e.right.BuildTemplate()
-	return template
-}
-
-func newBoolCompareTerm(op compareOp, target string, param any) boolExpr {
-	return &boolCompareTerm{
-		operator: op,
-		left:     &simpleExpr{template: target},
-		right:    &simpleExpr{template: "?", params: Params{params: []Param{{value: param}}}},
-	}
-}
-
-type likeTerm struct {
-	text    string
-	pattern string
-}
-
-func (e *likeTerm) BuildParams() Params { return Params{} }
-func (e *likeTerm) BuildTemplate() string {
-	return e.text + " LIKE(" + e.pattern + ")"
+	template += "?"
+	return Pred(template, Param{value: param})
 }

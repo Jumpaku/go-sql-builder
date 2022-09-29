@@ -2,29 +2,29 @@ package sql
 
 import "strings"
 
-func Table(name string) fromItem { return &fromItemTable{name: name} }
-func TableAs(name string, alias string) fromItem {
+func Table(name string) FromItem { return &fromItemTable{name: name} }
+func TableAs(name string, alias string) FromItem {
 	return &fromItemTable{name: name, fromItemBase: fromItemBase{alias: &alias}}
 }
-func Sub(stmt SelectStmt) fromItem {
+func Sub(stmt SelectStmt) FromItem {
 	return &fromItemSub{stmt: stmt}
 }
-func SubAs(stmt SelectStmt, alias string) fromItem {
+func SubAs(stmt SelectStmt, alias string) FromItem {
 	return &fromItemSub{stmt: stmt, fromItemBase: fromItemBase{alias: &alias}}
 }
 
-type fromItem interface {
+type FromItem interface {
 	BuildParams() Params
 	BuildTemplate() string
-	JoinOn(item fromItem, cond boolExpr) fromItem
-	JoinUsing(item fromItem, column string, columns ...string) fromItem
-	FullJoinOn(item fromItem, cond boolExpr) fromItem
-	FullJoinUsing(item fromItem, column string, columns ...string) fromItem
-	LeftJoinOn(item fromItem, cond boolExpr) fromItem
-	LeftJoinUsing(item fromItem, column string, columns ...string) fromItem
-	RightJoinOn(item fromItem, cond boolExpr) fromItem
-	RightJoinUsing(item fromItem, column string, columns ...string) fromItem
-	CrossJoin(item fromItem) fromItem
+	JoinOn(item FromItem, cond boolExpr) FromItem
+	JoinUsing(item FromItem, column string, columns ...string) FromItem
+	FullJoinOn(item FromItem, cond boolExpr) FromItem
+	FullJoinUsing(item FromItem, column string, columns ...string) FromItem
+	LeftJoinOn(item FromItem, cond boolExpr) FromItem
+	LeftJoinUsing(item FromItem, column string, columns ...string) FromItem
+	RightJoinOn(item FromItem, cond boolExpr) FromItem
+	RightJoinUsing(item FromItem, column string, columns ...string) FromItem
+	CrossJoin(item FromItem) FromItem
 }
 
 type fromItemBase struct {
@@ -69,8 +69,8 @@ func (t *fromItemSub) BuildTemplate() string {
 type fromItemJoin struct {
 	fromItemBase
 	joinOp       JoinOp
-	leftItem     fromItem
-	rightItem    fromItem
+	leftItem     FromItem
+	rightItem    FromItem
 	onCondition  boolExpr
 	usingColumns []string
 }
@@ -109,86 +109,86 @@ const (
 	JoinOp_RIGHT_OUTER JoinOp = "RIGHT OUTER"
 )
 
-func (i *fromItemTable) JoinOn(item fromItem, cond boolExpr) fromItem {
+func (i *fromItemTable) JoinOn(item FromItem, cond boolExpr) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_INNER, leftItem: i, rightItem: item, onCondition: cond}
 }
-func (i *fromItemTable) JoinUsing(item fromItem, column string, columns ...string) fromItem {
+func (i *fromItemTable) JoinUsing(item FromItem, column string, columns ...string) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_INNER, leftItem: i, rightItem: item, usingColumns: append([]string{column}, columns...)}
 }
-func (i *fromItemTable) FullJoinOn(item fromItem, cond boolExpr) fromItem {
+func (i *fromItemTable) FullJoinOn(item FromItem, cond boolExpr) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_FULL_OUTER, leftItem: i, rightItem: item, onCondition: cond}
 }
-func (i *fromItemTable) FullJoinUsing(item fromItem, column string, columns ...string) fromItem {
+func (i *fromItemTable) FullJoinUsing(item FromItem, column string, columns ...string) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_FULL_OUTER, leftItem: i, rightItem: item, usingColumns: append([]string{column}, columns...)}
 }
-func (i *fromItemTable) LeftJoinOn(item fromItem, cond boolExpr) fromItem {
+func (i *fromItemTable) LeftJoinOn(item FromItem, cond boolExpr) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_LEFT_OUTER, leftItem: i, rightItem: item, onCondition: cond}
 }
-func (i *fromItemTable) LeftJoinUsing(item fromItem, column string, columns ...string) fromItem {
+func (i *fromItemTable) LeftJoinUsing(item FromItem, column string, columns ...string) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_LEFT_OUTER, leftItem: i, rightItem: item, usingColumns: append([]string{column}, columns...)}
 }
-func (i *fromItemTable) RightJoinOn(item fromItem, cond boolExpr) fromItem {
+func (i *fromItemTable) RightJoinOn(item FromItem, cond boolExpr) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_RIGHT_OUTER, leftItem: i, rightItem: item, onCondition: cond}
 }
-func (i *fromItemTable) RightJoinUsing(item fromItem, column string, columns ...string) fromItem {
+func (i *fromItemTable) RightJoinUsing(item FromItem, column string, columns ...string) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_RIGHT_OUTER, leftItem: i, rightItem: item, usingColumns: append([]string{column}, columns...)}
 }
-func (i *fromItemTable) CrossJoin(item fromItem) fromItem {
+func (i *fromItemTable) CrossJoin(item FromItem) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_CROSS, leftItem: i, rightItem: item}
 }
 
-func (i *fromItemSub) JoinOn(item fromItem, cond boolExpr) fromItem {
+func (i *fromItemSub) JoinOn(item FromItem, cond boolExpr) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_INNER, leftItem: i, rightItem: item, onCondition: cond}
 }
-func (i *fromItemSub) JoinUsing(item fromItem, column string, columns ...string) fromItem {
+func (i *fromItemSub) JoinUsing(item FromItem, column string, columns ...string) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_INNER, leftItem: i, rightItem: item, usingColumns: append([]string{column}, columns...)}
 }
-func (i *fromItemSub) FullJoinOn(item fromItem, cond boolExpr) fromItem {
+func (i *fromItemSub) FullJoinOn(item FromItem, cond boolExpr) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_FULL_OUTER, leftItem: i, rightItem: item, onCondition: cond}
 }
-func (i *fromItemSub) FullJoinUsing(item fromItem, column string, columns ...string) fromItem {
+func (i *fromItemSub) FullJoinUsing(item FromItem, column string, columns ...string) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_FULL_OUTER, leftItem: i, rightItem: item, usingColumns: append([]string{column}, columns...)}
 }
-func (i *fromItemSub) LeftJoinOn(item fromItem, cond boolExpr) fromItem {
+func (i *fromItemSub) LeftJoinOn(item FromItem, cond boolExpr) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_LEFT_OUTER, leftItem: i, rightItem: item, onCondition: cond}
 }
-func (i *fromItemSub) LeftJoinUsing(item fromItem, column string, columns ...string) fromItem {
+func (i *fromItemSub) LeftJoinUsing(item FromItem, column string, columns ...string) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_LEFT_OUTER, leftItem: i, rightItem: item, usingColumns: append([]string{column}, columns...)}
 }
-func (i *fromItemSub) RightJoinOn(item fromItem, cond boolExpr) fromItem {
+func (i *fromItemSub) RightJoinOn(item FromItem, cond boolExpr) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_RIGHT_OUTER, leftItem: i, rightItem: item, onCondition: cond}
 }
-func (i *fromItemSub) RightJoinUsing(item fromItem, column string, columns ...string) fromItem {
+func (i *fromItemSub) RightJoinUsing(item FromItem, column string, columns ...string) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_RIGHT_OUTER, leftItem: i, rightItem: item, usingColumns: append([]string{column}, columns...)}
 }
-func (i *fromItemSub) CrossJoin(item fromItem) fromItem {
+func (i *fromItemSub) CrossJoin(item FromItem) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_CROSS, leftItem: i, rightItem: item}
 }
 
-func (i *fromItemJoin) JoinOn(item fromItem, cond boolExpr) fromItem {
+func (i *fromItemJoin) JoinOn(item FromItem, cond boolExpr) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_INNER, leftItem: i, rightItem: item, onCondition: cond}
 }
-func (i *fromItemJoin) JoinUsing(item fromItem, column string, columns ...string) fromItem {
+func (i *fromItemJoin) JoinUsing(item FromItem, column string, columns ...string) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_INNER, leftItem: i, rightItem: item, usingColumns: append([]string{column}, columns...)}
 }
-func (i *fromItemJoin) FullJoinOn(item fromItem, cond boolExpr) fromItem {
+func (i *fromItemJoin) FullJoinOn(item FromItem, cond boolExpr) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_FULL_OUTER, leftItem: i, rightItem: item, onCondition: cond}
 }
-func (i *fromItemJoin) FullJoinUsing(item fromItem, column string, columns ...string) fromItem {
+func (i *fromItemJoin) FullJoinUsing(item FromItem, column string, columns ...string) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_FULL_OUTER, leftItem: i, rightItem: item, usingColumns: append([]string{column}, columns...)}
 }
-func (i *fromItemJoin) LeftJoinOn(item fromItem, cond boolExpr) fromItem {
+func (i *fromItemJoin) LeftJoinOn(item FromItem, cond boolExpr) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_LEFT_OUTER, leftItem: i, rightItem: item, onCondition: cond}
 }
-func (i *fromItemJoin) LeftJoinUsing(item fromItem, column string, columns ...string) fromItem {
+func (i *fromItemJoin) LeftJoinUsing(item FromItem, column string, columns ...string) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_LEFT_OUTER, leftItem: i, rightItem: item, usingColumns: append([]string{column}, columns...)}
 }
-func (i *fromItemJoin) RightJoinOn(item fromItem, cond boolExpr) fromItem {
+func (i *fromItemJoin) RightJoinOn(item FromItem, cond boolExpr) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_RIGHT_OUTER, leftItem: i, rightItem: item, onCondition: cond}
 }
-func (i *fromItemJoin) RightJoinUsing(item fromItem, column string, columns ...string) fromItem {
+func (i *fromItemJoin) RightJoinUsing(item FromItem, column string, columns ...string) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_RIGHT_OUTER, leftItem: i, rightItem: item, usingColumns: append([]string{column}, columns...)}
 }
-func (i *fromItemJoin) CrossJoin(item fromItem) fromItem {
+func (i *fromItemJoin) CrossJoin(item FromItem) FromItem {
 	return &fromItemJoin{joinOp: JoinOp_CROSS, leftItem: i, rightItem: item}
 }
